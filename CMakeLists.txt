@@ -30,5 +30,5 @@ TARGET_LINK_LIBRARIES(
 
 ######## Install targets ########
 INSTALL(TARGETS ubiimgrdr
-	RUNTIME DESTINATION usr/bin
+	RUNTIME DESTINATION bin
 )
