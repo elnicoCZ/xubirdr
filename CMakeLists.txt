@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.8.1)
 
 ######## Project settings ########
-PROJECT(ubiimgrdr)
+PROJECT(xubirdr)
 SET(LICENSE "TBD")
 
 ######## Build and include settings ########
@@ -19,16 +19,16 @@ file(GLOB SOURCES
 )
 
 add_executable(
-	ubiimgrdr
+	xubirdr
 
 	${SOURCES}
 )
 
 TARGET_LINK_LIBRARIES(
-	ubiimgrdr
+	xubirdr
 )
 
 ######## Install targets ########
-INSTALL(TARGETS ubiimgrdr
+INSTALL(TARGETS xubirdr
 	RUNTIME DESTINATION bin
 )
