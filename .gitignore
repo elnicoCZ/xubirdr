@@ -1,0 +1,6 @@
+.settings
+debug-*/
+*_gdb_arm-poky-linux-gnueabi.launch
+.gdbinit
+toolchain.cmake
+
