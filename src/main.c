@@ -30,8 +30,8 @@ enum {
 //******************************************************************************
 
 typedef struct t_config_struct {
-  uint32_t              u32AddrStart;
-  uint32_t              u32AddrStop;
+  uint32_t              u32Addr;                                                // XUBI image address
+  uint32_t              u32Size;                                                // maximum XUBI image size
   uint8_t               bDryRun;                                                // do not output the file
 } TConfig;
 
@@ -57,12 +57,11 @@ void printUsage (const char * sProgName);
  */
 int main(int argc, char **argv) {
   TConfig     oConfig = {
-    .u32AddrStart   = -1,
-    .u32AddrStop    = -1,
+    .u32Addr        = -1,
+    .u32Size        = 0,
     .bDryRun        = 0,
   };
   int         fdMem;
-  uint32_t    u32AddrSize;
   uint32_t    u32AllocMemSize;
   uint32_t    u32PageMask;
   uint32_t    u32PageSize;
@@ -81,12 +80,10 @@ int main(int argc, char **argv) {
   if (RET_HELP == ret) printUsage(argv[0]);
 
   if ((RET_SUCCESS == ret) &&
-      ((-1 == oConfig.u32AddrStart) ||
-       (-1 == oConfig.u32AddrStop) ||
-       (oConfig.u32AddrStop <= oConfig.u32AddrStart))
+      ((-1 == oConfig.u32Addr) || (0 == oConfig.u32Size))
      )
   {
-    fprintf(stderr, "Error: FROM_ADDR and/or TO_ADDR not specified or invalid.\n"
+    fprintf(stderr, "Error: ADDR and/or MAX_SIZE not specified or invalid.\n"
                     "Use --help for usage.\n");
     ret = RET_INVALID_ARGUMENT;
   }
@@ -105,9 +102,8 @@ int main(int argc, char **argv) {
   }
 
   // calculate aligned address
-  u32AddrSize = oConfig.u32AddrStop - oConfig.u32AddrStart;
   u32PageSize = sysconf(_SC_PAGESIZE);
-  u32AllocMemSize = (((u32AddrSize / u32PageSize) + 1) * u32PageSize);
+  u32AllocMemSize = (((oConfig.u32Size / u32PageSize) + 1) * u32PageSize);
   u32PageMask = (u32PageSize - 1);
 
   // mmap the address
@@ -116,7 +112,7 @@ int main(int argc, char **argv) {
                       PROT_READ,
                       MAP_SHARED,
                       fdMem,
-                      (oConfig.u32AddrStart & ~u32PageMask)
+                      (oConfig.u32Addr & ~u32PageMask)
                      );
   if (MAP_FAILED == pvMemPointer) {
     perror("Error: mmap() failed");
@@ -124,13 +120,13 @@ int main(int argc, char **argv) {
     return RET_MMAP_FAILURE;
   }
   // here's the virtual address pointer
-  pvVirtAddr = (pvMemPointer + (oConfig.u32AddrStart & u32PageMask));
+  pvVirtAddr = (pvMemPointer + (oConfig.u32Addr & u32PageMask));
 
   // Program Body --------------------------------------------------------------
 
   // data pointers
   pc = (char*)pvVirtAddr;
-  pz = pc + u32AddrSize;      // maximum size trigger
+  pz = pc + oConfig.u32Size;      // maximum size trigger
 
   // check the file header
   bValid  = (0 == strncmp(pc  , "XUBI", 4));
@@ -184,8 +180,8 @@ int main(int argc, char **argv) {
 int parseOptions (TConfig * poConfig, int argc, char * argv[])
 {
   struct option   aoArgOptions [] = {
-      { "from"          , required_argument , 0,  'f' },
-      { "to"            , required_argument , 0,  't' },
+      { "addr"          , required_argument , 0,  'a' },
+      { "max-size"      , required_argument , 0,  's' },
       { "dry-run"       , no_argument       , 0,  'n' },
       { "help"          , no_argument       , 0,  'h' },
       { 0               , 0                 , 0,  0   },
@@ -198,7 +194,7 @@ int parseOptions (TConfig * poConfig, int argc, char * argv[])
   if (!poConfig) return RET_INVALID_ARGUMENT;
 
   while (iOptionChar >= 0) {
-    iOptionChar = getopt_long(argc, argv, "f:t:nh", aoArgOptions, &iOptionIdx);
+    iOptionChar = getopt_long(argc, argv, "a:s:nh", aoArgOptions, &iOptionIdx);
 
     switch (iOptionChar) {
     case -1:
@@ -210,12 +206,12 @@ int parseOptions (TConfig * poConfig, int argc, char * argv[])
           (int)iOptionChar, (char)iOptionChar, iOptionIdx);
       break;
 
-    case 'f':
-      poConfig->u32AddrStart = strtoul(optarg, NULL, 16);
+    case 'a':
+      poConfig->u32Addr = strtoul(optarg, NULL, 16);
       break;
 
-    case 't':
-      poConfig->u32AddrStop = strtoul(optarg, NULL, 16);
+    case 's':
+      poConfig->u32Size = strtoul(optarg, NULL, 16);
       break;
 
     case 'n':
@@ -244,19 +240,18 @@ int parseOptions (TConfig * poConfig, int argc, char * argv[])
 void printUsage (const char * sProgName)
 {
   fprintf(stdout,
-          "Usage: %s -f FROM_ADDR -t TO_ADDR [ -n ] [ -h ]\n"
+          "Usage: %s -a ADDR -s MAX_SIZE [ -n ] [ -h ]\n"
           "Read XUBI image from a memory at given physical address\n",
           "and print UBI image to the standard output.\n\n",
           sProgName);
 
   fprintf(stdout,
-          "  -f, --from       Physical address where the XUBI image starts\n"
+          "  -a, --addr       Physical address where the XUBI image starts\n"
           "                   in hexadecimal format including \"0x\",\n"
           "                   e.g. \"0x82000000\". Mandatory argument.\n\n");
   fprintf(stdout,
-          "  -t, --to         First physical address past the allowed range,\n"
-          "                   i.e. the lowest address which cannot be accessed\n"
-          "                   by the program. Mandatory argument.\n\n");
+          "  -s, --max-size   Maximum size of the image in bytes.\n"
+          "                   Mandatory argument.\n\n");
   fprintf(stdout,
           "  -n, --dry-run    Do not output the UBI image, just print its size\n"
           "                   in bytes to stdout.\n\n");
